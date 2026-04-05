@@ -1,0 +1,36 @@
+FROM python:3.12-slim-bookworm
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Release assets: x86_64 has -unknown-linux-gnu; aarch64 Linux only has -unknown-linux-musl (no gnu tarball).
+ARG TECTONIC_VERSION=0.15.0
+RUN set -eux \
+    && ARCH="$(uname -m)" \
+    && case "$ARCH" in \
+        x86_64) TARCH=x86_64-unknown-linux-gnu ;; \
+        aarch64) TARCH=aarch64-unknown-linux-musl ;; \
+        arm64) TARCH=aarch64-unknown-linux-musl ;; \
+        *) echo "unsupported arch: $ARCH" >&2; exit 1 ;; \
+    esac \
+    && TAR="tectonic-${TECTONIC_VERSION}-${TARCH}.tar.gz" \
+    && wget -qO "/tmp/${TAR}" \
+        "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%40${TECTONIC_VERSION}/${TAR}" \
+    && tar -xzf "/tmp/${TAR}" -C /tmp \
+    && TECT_BIN="$(find /tmp -maxdepth 4 -type f \( -name tectonic -o -path '*/tectonic' \) | head -n 1)" \
+    && test -n "$TECT_BIN" \
+    && install -m 0755 "$TECT_BIN" /usr/local/bin/tectonic \
+    && rm -rf /tmp/tectonic-* "/tmp/${TAR}"
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app ./app
+COPY templates ./templates
+
+CMD ["arq", "app.worker_tasks.WorkerSettings"]

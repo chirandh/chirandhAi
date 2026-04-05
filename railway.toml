@@ -1,0 +1,12 @@
+# Default service: API. Create a second Railway service for the worker using the same repo
+# with root directory / and start command: arq app.worker_tasks.WorkerSettings
+# and Dockerfile path: Dockerfile.worker
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile.api"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
